@@ -34,12 +34,15 @@ kind: Service
 metadata:
   name: employee-api
 spec:
+  type: NodePort
   selector:
     app: employee-api
   ports:
-  - port: 80
-    targetPort: 5000
-  type: LoadBalancer
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30261  
+      
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -69,6 +72,13 @@ spec:
           value: employee_user
         - name: MYSQL_PASSWORD
           value: Jessica@117311
+        volumeMounts:
+        - name: mysql-init-script
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      - name: mysql-init-script
+        configMap:
+          name: mysql-init-script
 ---
 apiVersion: v1
 kind: Service
@@ -77,6 +87,8 @@ metadata:
 spec:
   selector:
     app: mysql
-  ports:
+  ports:  
   - port: 3306
   type: ClusterIP 
+
+  
