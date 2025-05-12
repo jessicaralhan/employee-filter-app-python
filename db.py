@@ -1,54 +1,29 @@
-import mysql.connector
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine import URL
 from configparser import ConfigParser
 from logger import get_logger
 
 logger = get_logger(__name__)
 
-def get_connection():
-    try:       
-        config = ConfigParser()
-        config.read('config.ini')
-                
-        connection = mysql.connector.connect(
-            host=config['mysql']['host'],
-            user=config['mysql']['user'],
-            password=config['mysql']['password'],
-            database=config['mysql']['database']
-        )
-        logger.info("Database connection established successfully")
-        return connection
-    except mysql.connector.Error as err:
-        logger.error(f"Failed to connect to database: {err}")
-        raise
+config = ConfigParser()
+config.read('config.ini')
 
-def execute_query(statement, params=(), fetch=False):
-    conn = None
-    cursor = None   
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True, buffered=True)  
-        print("statement", statement)
-        print("params", params)
-        logger.info(f"Executing query: {statement}")
-        logger.info(f"With parameters: {params}")
-        cursor.execute(statement, params)
-        
-        if fetch:
-            result = cursor.fetchall()
-            return result
-        
-        conn.commit()
-        logger.info("Query executed successfully")
-        return True
-        
-    except mysql.connector.Error as err:
-        logger.error(f"Database error: {err}")
-        if conn:
-            conn.rollback()
-        raise
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-            logger.info("Database connection closed")
+# DB_URL = URL.create(
+#     drivername='mysql+mysqlconnector',
+#     username=config['mysql']['user'],
+#     password=config['mysql']['password'],
+#     host=config['mysql']['host'],
+#     database=config['mysql']['database']
+# )
+
+# print("db_url",DB_URL)
+DB_URL = f"mysql+mysqlconnector://{config['mysql']['user']}:{config['mysql']['password']}@{config['mysql']['host']}/{config['mysql']['database']}"  #db url
+# connect to your mysql database
+
+engine = create_engine(DB_URL, echo=False)    # slqalchemy engine created 
+logger.info("SQLAlchemy engine created successfully")
+
+# session class used to interact with the database
+SessionLocal = sessionmaker(autocommit=False , autoflush=False, bind=engine)   # configured Session class created
+logger.info("SessionLocal configured successfully")

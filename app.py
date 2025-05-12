@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
-from db import execute_query, get_connection
+from db import SessionLocal
+from models import Employee
 from logger import get_logger
 
 app = Flask(__name__)
@@ -12,29 +13,34 @@ def index():
 
 @app.route('/employees', methods=['GET'])
 def get_employees():
+    session = SessionLocal()
     try:
         status = request.args.get('status')
         country = request.args.get('country')
         logger.info(f"Fetching employees with filters - status: {status}, country: {country}")
 
-        query = "SELECT id, name, status, country FROM employees WHERE 1=1"
-        params = []
-
+        query = session.query(Employee)
         if status:
-            query += " AND status = %s"
-            params.append(status)
+            query = query.filter(Employee.status == status)
         if country:
-            query += " AND country = %s"
-            params.append(country)
+            query = query.filter(Employee.country == country)
 
-        data = execute_query(query, params, fetch=True)
-        return jsonify(data)
+        employees = query.all()
+        return jsonify([{
+            "id": emp.id,
+            "name": emp.name,
+            "status": emp.status,
+            "country": emp.country
+        } for emp in employees])
     except Exception as e:
         logger.error(f"Error fetching employees: {str(e)}")
-        return jsonify({"error": f"Internal server error: {str(e)}"})
-    
+        return jsonify({"error": "Internal server error"})
+    finally:
+        session.close()
+
 @app.route('/employees', methods=['POST'])
 def add_employee():
+    session = SessionLocal()
     try:
         data = request.get_json()
         if not data:
@@ -54,13 +60,18 @@ def add_employee():
             logger.warning(f"Invalid status provided: {status}")
             return jsonify({'error': f'Status must be one of active/inactive'})
 
-        insert_query = "INSERT INTO employees (name, country, status) VALUES (%s, %s, %s)"
-        execute_query(insert_query, (name, country, status.lower()))
+        new_employee = Employee(name=name, country=country, status=status.lower())
+        session.add(new_employee)
+        session.commit()
+
         logger.info(f"Successfully added new employee: {name}")
         return jsonify({'message': 'Employee added successfully'})
     except Exception as e:
+        session.rollback()
         logger.error(f"Error adding employee: {str(e)}")
-        return jsonify({"error": f"Internal server error"})
+        return jsonify({"error": "Internal server error"})
+    finally:
+        session.close()
 
 if __name__ == '__main__':
     logger.info("Starting Employee API server")
